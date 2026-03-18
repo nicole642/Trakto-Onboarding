@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Avaliação de Onboarding — Trakto CS</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f3f4f6; min-height: 100vh; padding: 24px 16px; color: #111827; }
+    input, select, textarea, button { font-family: inherit; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // ⚠️ COLOQUE SUAS CREDENCIAIS DO SUPABASE AQUI
+    const SUPABASE_URL = "https://cownkkumkdltpgcowtvj.supabase.co"
+    const SUPABASE_KEY = "sb_publishable_1ak6t3_AxQTzm0XvBGqqoQ_WSpCUkxx"
+
+    const { createClient } = supabase
+    const sb = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+    const { useState, useEffect } = React
+
+    const SESSIONS = [
+      "Sessão 1 — Editor & Escalabilidade",
+      "Sessão 2 — Hub de IA",
+      "Sessão 3 — Motion Design",
+    ]
+
+    const PILLARS = [
+      { id: "kv", label: "Subir KV do cliente" },
+      { id: "unfold", label: "Desdobrar peças" },
+      { id: "scale", label: "Criar variações em escala" },
+    ]
+
+    const CRITERIA = [
+      { id: "communication", label: "Clareza de comunicação" },
+      { id: "didactics", label: "Didática da explicação" },
+      { id: "platform", label: "Domínio da plataforma" },
+      { id: "flow", label: "Fluxo lógico da apresentação" },
+      { id: "demo", label: "Demonstração prática do produto" },
+      { id: "qa", label: "Capacidade de responder dúvidas" },
+      { id: "time", label: "Uso eficiente do tempo" },
+      { id: "narrative", label: "Organização da narrativa" },
+      { id: "prep", label: "Preparação prévia (testes, templates)" },
+      { id: "recorded", label: "Gravou a sessão para envio ao cliente" },
+    ]
+
+    const CHECKLIST = [
+      { id: "kv_upload", label: "Upload ou importação de KV demonstrado" },
+      { id: "ai_unfold", label: "Desdobramento via IA demonstrado" },
+      { id: "manual_unfold", label: "Desdobramento manual demonstrado" },
+      { id: "variations", label: "Criação de variações (mín. 3 formatos)" },
+      { id: "tags", label: "Criação de campanha e tags do zero" },
+      { id: "spreadsheet", label: "Uso de planilha explicado" },
+      { id: "random_gen", label: "Geração randômica explicada" },
+      { id: "preview", label: "Preview dos assets mostrado" },
+      { id: "export", label: "Exportação / envio para Google Ads" },
+    ]
+
+    const initialForm = () => ({
+      facilitator: "", date: "", session: SESSIONS[0], type: "simulation",
+      client: "", kv: "", evaluators: "",
+      pillars: { kv: false, unfold: false, scale: false },
+      scores: Object.fromEntries(CRITERIA.map(c => [c.id, 0])),
+      checklist: Object.fromEntries(CHECKLIST.map(c => [c.id, false])),
+      positives: "", improvements: "", recommendations: "", nextSteps: "",
+    })
+
+    const scoreColor = n => {
+      if (!n) return "#e5e7eb"
+      if (n <= 4) return "#ef4444"
+      if (n <= 6) return "#f59e0b"
+      if (n <= 8) return "#3b82f6"
+      return "#22c55e"
+    }
+
+    const avg = scores => {
+      const vals = Object.values(scores).filter(v => v > 0)
+      if (!vals.length) return 0
+      return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)
+    }
+
+    const impactScore = (scores, pillars) => {
+      const keys = ["kv", "unfold", "scale", "platform"]
+      const vals = keys.map(k => scores[k] || 0)
+      const bonus = Object.values(pillars).filter(Boolean).length * 0.5
+      return Math.min(10, ((vals.reduce((a, b) => a + b, 0) / keys.length) + bonus).toFixed(1))
+    }
+
+    const wrap = { maxWidth: 700, margin: "0 auto", background: "#fff", borderRadius: 14, padding: 28, boxShadow: "0 1px 4px rgba(0,0,0,.08)" }
+    const lbl = { display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 4 }
+    const inp = { width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 14, boxSizing: "border-box", outline: "none" }
+    const btn = (bg, small) => ({ background: bg, color: "#fff", border: "none", borderRadius: 8, padding: small ? "8px 16px" : "10px 20px", fontWeight: 600, cursor: "pointer", fontSize: small ? 13 : 14 })
+
+    const Section = ({ title, children }) => (
+      <div style={{ marginBottom: 28 }}>
+        <h3 style={{ margin: "0 0 14px", fontSize: 15, borderBottom: "2px solid #e5e7eb", paddingBottom: 8 }}>{title}</h3>
+        {children}
+      </div>
+    )
+
+    const Row = ({ children }) => <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>{children}</div>
+
+    const Field = ({ label, value, onChange, placeholder, type = "text", full }) => (
+      <div style={{ flex: full ? "1 1 100%" : 1, minWidth: 160 }}>
+        <label style={lbl}>{label}</label>
+        <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={inp} />
+      </div>
+    )
+
+    const TextArea = ({ label, value, onChange, placeholder }) => (
+      <div style={{ marginBottom: 14 }}>
+        <label style={lbl}>{label}</label>
+        <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={3} style={{ ...inp, resize: "vertical", lineHeight: 1.5 }} />
+      </div>
+    )
+
+    const Stat = ({ label, value, highlight, small }) => (
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: small ? 20 : 28, fontWeight: 800, color: highlight ? "#7c3aed" : "#111" }}>{value}</div>
+        <div style={{ fontSize: 11, color: "#6b7280" }}>{label}</div>
+      </div>
+    )
+
+    function App() {
+      const [form, setForm] = useState(initialForm())
+      const [view, setView] = useState("form")
+      const [history, setHistory] = useState([])
+      const [loading, setLoading] = useState(false)
+      const [loadingHistory, setLoadingHistory] = useState(false)
+      const [error, setError] = useState(null)
+      const [lastEntry, setLastEntry] = useState(null)
+
+      const fetchHistory = async () => {
+        setLoadingHistory(true)
+        const { data, error } = await sb.from("evaluations").select("*").order("created_at", { ascending: false })
+        if (!error) setHistory(data || [])
+        setLoadingHistory(false)
+      }
+
+      useEffect(() => { if (view === "history") fetchHistory() }, [view])
+
+      const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+      const setScore = (id, val) => setForm(f => ({ ...f, scores: { ...f.scores, [id]: val } }))
+      const togglePillar = id => setForm(f => ({ ...f, pillars: { ...f.pillars, [id]: !f.pillars[id] } }))
+      const toggleCheck = id => setForm(f => ({ ...f, checklist: { ...f.checklist, [id]: !f.checklist[id] } }))
+
+      const handleSubmit = async () => {
+        if (!form.facilitator || !form.date) return alert("Preencha facilitador e data.")
+        setLoading(true)
+        setError(null)
+        const payload = {
+          facilitator: form.facilitator, date: form.date, session: form.session,
+          type: form.type, client: form.client, kv: form.kv, evaluators: form.evaluators,
+          pillars: form.pillars, scores: form.scores, checklist: form.checklist,
+          positives: form.positives, improvements: form.improvements,
+          recommendations: form.recommendations, next_steps: form.nextSteps,
+          overall_avg: parseFloat(avg(form.scores)),
+          impact_score: parseFloat(impactScore(form.scores, form.pillars)),
+        }
+        const { data, error } = await sb.from("evaluations").insert([payload]).select().single()
+        if (error) { setError("Erro ao salvar: " + error.message); setLoading(false); return }
+        setLastEntry({ ...payload, ...data })
+        setForm(initialForm())
+        setLoading(false)
+        setView("success")
+      }
+
+      if (view === "success" && lastEntry) return (
+        <div style={wrap}>
+          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: 24, marginBottom: 20 }}>
+            <h2 style={{ color: "#15803d", margin: "0 0 8px" }}>✅ Avaliação salva no banco!</h2>
+            <p style={{ margin: 0, color: "#166534" }}>{lastEntry.facilitator} — {lastEntry.session} — {lastEntry.date}</p>
+            <div style={{ display: "flex", gap: 24, marginTop: 16, flexWrap: "wrap" }}>
+              <Stat label="Média Geral" value={lastEntry.overall_avg} />
+              <Stat label="Impact Score" value={lastEntry.impact_score} highlight />
+              <Stat label="Pilares" value={`${Object.values(lastEntry.pillars).filter(Boolean).length}/3`} />
+              <Stat label="Checklist" value={`${Object.values(lastEntry.checklist).filter(Boolean).length}/${CHECKLIST.length}`} />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button onClick={() => setView("form")} style={btn("#2563eb")}>Nova avaliação</button>
+            <button onClick={() => setView("history")} style={btn("#7c3aed")}>Ver histórico</button>
+          </div>
+        </div>
+      )
+
+      if (view === "history") return (
+        <div style={wrap}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+            <h2 style={{ margin: 0 }}>📈 Histórico de Avaliações</h2>
+            <button onClick={() => setView("form")} style={btn("#6b7280", true)}>← Voltar</button>
+          </div>
+          {loadingHistory ? <p style={{ color: "#6b7280" }}>Carregando...</p> : history.length === 0 ? (
+            <p style={{ color: "#6b7280" }}>Nenhuma avaliação registrada ainda.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {history.map((h, i) => (
+                <div key={h.id} style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, background: "#fff" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                    <div>
+                      <strong>#{history.length - i}</strong> — {h.facilitator}
+                      <div style={{ color: "#6b7280", fontSize: 13 }}>{h.session} · {h.date} · {h.type === "simulation" ? "Simulação" : "Cliente real"}</div>
+                      {h.client && <div style={{ color: "#9ca3af", fontSize: 12 }}>Cliente: {h.client}</div>}
+                    </div>
+                    <div style={{ display: "flex", gap: 16 }}>
+                      <Stat label="Média" value={h.overall_avg} small />
+                      <Stat label="Impact Score" value={h.impact_score} highlight small />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {PILLARS.map(p => (
+                      <span key={p.id} style={{ fontSize: 12, padding: "2px 8px", borderRadius: 99, background: h.pillars?.[p.id] ? "#dcfce7" : "#fee2e2", color: h.pillars?.[p.id] ? "#15803d" : "#b91c1c" }}>
+                        {h.pillars?.[p.id] ? "✓" : "✗"} {p.label}
+                      </span>
+                    ))}
+                  </div>
+                  {(h.positives || h.improvements) && (
+                    <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                      {h.positives && <p style={{ margin: 0, fontSize: 13, color: "#374151" }}>💚 {h.positives}</p>}
+                      {h.improvements && <p style={{ margin: 0, fontSize: 13, color: "#374151" }}>🟨 {h.improvements}</p>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+
+      return (
+        <div style={wrap}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: 22 }}>📋 Avaliação de Onboarding</h1>
+              <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 14 }}>Trakto Studio · Customer Success</p>
+            </div>
+            <button onClick={() => setView("history")} style={btn("#7c3aed", true)}>Ver histórico</button>
+          </div>
+
+          <div style={{ display: "flex", gap: 16, marginBottom: 20, padding: "10px 14px", background: "#f9fafb", borderRadius: 8 }}>
+            {[{e:"💚",l:"Positivo"},{e:"🟨",l:"Pode melhorar"},{e:"🚩",l:"Crítico"}].map(x => (
+              <span key={x.e} style={{ fontSize: 13, color: "#374151" }}>{x.e} {x.l}</span>
+            ))}
+          </div>
+
+          {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: "#b91c1c", fontSize: 14 }}>🚨 {error}</div>}
+
+          <Section title="1. Informações da Sessão">
+            <Row>
+              <Field label="Facilitador *" value={form.facilitator} onChange={v => set("facilitator", v)} placeholder="Ex: Rafael Nascimento" />
+              <Field label="Data *" type="date" value={form.date} onChange={v => set("date", v)} />
+            </Row>
+            <Row>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Sessão</label>
+                <select value={form.session} onChange={e => set("session", e.target.value)} style={inp}>
+                  {SESSIONS.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={lbl}>Tipo</label>
+                <select value={form.type} onChange={e => set("type", e.target.value)} style={inp}>
+                  <option value="simulation">Simulação interna</option>
+                  <option value="real">Onboarding com cliente real</option>
+                </select>
+              </div>
+            </Row>
+            <Row>
+              <Field label="Cliente / Conta" value={form.client} onChange={v => set("client", v)} placeholder="Ex: Empresa XYZ" />
+              <Field label="KV utilizado" value={form.kv} onChange={v => set("kv", v)} placeholder="Ex: KV Verão 2026" />
+            </Row>
+            <Field label="Avaliadores" value={form.evaluators} onChange={v => set("evaluators", v)} placeholder="Ex: César Oliveira" full />
+          </Section>
+
+          <Section title="2. Os 3 Pilares foram demonstrados? 🚩">
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {PILLARS.map(p => (
+                <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "10px 14px", borderRadius: 8, border: `1px solid ${form.pillars[p.id] ? "#86efac" : "#fca5a5"}`, background: form.pillars[p.id] ? "#f0fdf4" : "#fff1f2" }}>
+                  <input type="checkbox" checked={form.pillars[p.id]} onChange={() => togglePillar(p.id)} style={{ width: 16, height: 16 }} />
+                  <span style={{ fontWeight: 500 }}>{p.label}</span>
+                  <span style={{ marginLeft: "auto", fontSize: 18 }}>{form.pillars[p.id] ? "💚" : "🚩"}</span>
+                </label>
+              ))}
+            </div>
+          </Section>
+
+          <Section title="3. Avaliação por Critério (1–10)">
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {CRITERIA.map(c => (
+                <div key={c.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                    <span style={{ fontSize: 14, color: "#374151" }}>{c.label}</span>
+                    <span style={{ fontWeight: 700, color: scoreColor(form.scores[c.id]) }}>{form.scores[c.id] || "—"}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                      <button key={n} onClick={() => setScore(c.id, n)} style={{ flex: 1, height: 28, borderRadius: 4, border: "none", cursor: "pointer", background: form.scores[c.id] === n ? scoreColor(n) : "#e5e7eb", color: form.scores[c.id] === n ? "#fff" : "#6b7280", fontWeight: form.scores[c.id] === n ? 700 : 400, fontSize: 12 }}>
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ marginTop: 16, padding: "10px 14px", background: "#f0f9ff", borderRadius: 8, display: "flex", justifyContent: "space-between" }}>
+              <span style={{ color: "#0369a1", fontWeight: 600 }}>Média dos critérios</span>
+              <span style={{ color: "#0369a1", fontWeight: 700, fontSize: 18 }}>{avg(form.scores)}</span>
+            </div>
+          </Section>
+
+          <Section title="4. Checklist de Demonstração">
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {CHECKLIST.map(c => (
+                <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "8px 12px", borderRadius: 6, background: form.checklist[c.id] ? "#f0fdf4" : "#fafafa", border: "1px solid #e5e7eb" }}>
+                  <input type="checkbox" checked={form.checklist[c.id]} onChange={() => toggleCheck(c.id)} style={{ width: 15, height: 15 }} />
+                  <span style={{ fontSize: 14, color: "#374151" }}>{c.label}</span>
+                  {form.checklist[c.id] && <span style={{ marginLeft: "auto" }}>✅</span>}
+                </label>
+              ))}
+            </div>
+            <div style={{ marginTop: 12, color: "#6b7280", fontSize: 13 }}>
+              {Object.values(form.checklist).filter(Boolean).length}/{CHECKLIST.length} itens concluídos
+            </div>
+          </Section>
+
+          <Section title="5. Análise Qualitativa">
+            <TextArea label="💚 Pontos positivos" value={form.positives} onChange={v => set("positives", v)} placeholder="O que funcionou bem nessa sessão?" />
+            <TextArea label="🟨🚩 Pontos de melhoria" value={form.improvements} onChange={v => set("improvements", v)} placeholder="O que precisa melhorar?" />
+            <TextArea label="Recomendações práticas" value={form.recommendations} onChange={v => set("recommendations", v)} placeholder="Sugestões concretas para a próxima sessão..." />
+            <TextArea label="Próximos passos" value={form.nextSteps} onChange={v => set("nextSteps", v)} placeholder="Ações combinadas para evoluir..." />
+          </Section>
+
+          <div style={{ padding: "16px 20px", background: "#faf5ff", border: "1px solid #e9d5ff", borderRadius: 10, marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div style={{ fontWeight: 700, color: "#7c3aed" }}>Onboarding Impact Score (prévia)</div>
+              <div style={{ fontSize: 13, color: "#6b7280" }}>(KV + Desdobramento + Escala + Domínio) / 4 + bônus pilares</div>
+            </div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "#7c3aed" }}>{impactScore(form.scores, form.pillars)}</div>
+          </div>
+
+          <button onClick={handleSubmit} disabled={loading} style={{ ...btn(loading ? "#9ca3af" : "#2563eb"), width: "100%", padding: "14px", fontSize: 16, cursor: loading ? "not-allowed" : "pointer" }}>
+            {loading ? "Salvando..." : "Registrar avaliação"}
+          </button>
+        </div>
+      )
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />)
+  </script>
+</body>
+</html>
